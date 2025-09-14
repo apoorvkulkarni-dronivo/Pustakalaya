@@ -27,7 +27,18 @@ struct MainTabView: View {
                     Text("Lent Out")
                 }
                 .environmentObject(libraryManager)
-                .badge(libraryManager.lentBooks.count > 0 ? libraryManager.lentBooks.count : nil)
+                .overlay(alignment: .topTrailing) {
+                    if libraryManager.lentBooks.count > 0 {
+                        Text("\(libraryManager.lentBooks.count)")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .background(Color.red)
+                            .clipShape(Circle())
+                            .offset(x: 8, y: -8)
+                    }
+                }
             
             StatisticsView()
                 .tabItem {

@@ -74,7 +74,7 @@ struct AppPrimaryButtonStyle: ButtonStyle {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.appPrimary)
+                    .fill(Color.appPrimary)
                     .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             )
             .appButtonShadow()
@@ -86,15 +86,15 @@ struct AppSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.appSubheadline)
-            .foregroundColor(.appPrimary)
+            .foregroundColor(Color.appPrimary)
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(.appPrimary, lineWidth: 2)
+                    .stroke(Color.appPrimary, lineWidth: 2)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(.appPrimary.opacity(configuration.isPressed ? 0.1 : 0.0))
+                            .fill(Color.appPrimary.opacity(configuration.isPressed ? 0.1 : 0.0))
                     )
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
@@ -105,7 +105,7 @@ struct AppSecondaryButtonStyle: ButtonStyle {
 struct AppFloatingButtonStyle: ButtonStyle {
     let color: Color
     
-    init(color: Color = .appPrimary) {
+    init(color: Color = Color.appPrimary) {
         self.color = color
     }
     
@@ -135,7 +135,7 @@ struct AppCard<Content: View>: View {
     var body: some View {
         content
             .padding()
-            .background(.appCardBackground)
+            .background(Color.appCardBackground)
             .cornerRadius(16)
             .appCardShadow()
     }
@@ -149,10 +149,10 @@ struct AppTextFieldStyle: TextFieldStyle {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.appBackground)
+                    .fill(Color.appBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.appSecondary.opacity(0.3), lineWidth: 1)
+                            .stroke(Color.appSecondary.opacity(0.3), lineWidth: 1)
                     )
             )
     }
@@ -162,7 +162,7 @@ struct AppTextFieldStyle: TextFieldStyle {
 struct AppProgressViewStyle: ProgressViewStyle {
     let color: Color
     
-    init(color: Color = .appPrimary) {
+    init(color: Color = Color.appPrimary) {
         self.color = color
     }
     
@@ -179,7 +179,7 @@ struct AppBadge: View {
     let text: String
     let color: Color
     
-    init(_ text: String, color: Color = .appPrimary) {
+    init(_ text: String, color: Color = Color.appPrimary) {
         self.text = text
         self.color = color
     }
@@ -202,7 +202,7 @@ struct AppBadge: View {
 struct AppDivider: View {
     var body: some View {
         Rectangle()
-            .fill(.appSecondary.opacity(0.2))
+            .fill(Color.appSecondary.opacity(0.2))
             .frame(height: 1)
     }
 }

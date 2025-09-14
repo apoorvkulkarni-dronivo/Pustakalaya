@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: apoorv.kulkarni@dronivo.com
+//  Email: https://ak-apoorvkulkarni.github.io/
 //  Description: ViewModel for managing library data and operations
 //
 

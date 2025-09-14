@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: apoorv.kulkarni@dronivo.com
+//  Email: https://ak-apoorvkulkarni.github.io/
 //  Description: Barcode scanner component for book ISBN scanning
 //
 

@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: apoorv.kulkarni@dronivo.com
+//  Email: https://ak-apoorvkulkarni.github.io/
 //  Description: Main tab navigation structure for the library management app
 //
 

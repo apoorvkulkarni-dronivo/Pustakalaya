@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: apoorv.kulkarni@dronivo.com
+//  Email: https://ak-apoorvkulkarni.github.io/
 //  Description: Design system with custom fonts, colors, and styling for modern UI
 //
 

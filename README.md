@@ -165,7 +165,7 @@ Planned features for future updates:
 
 For questions, suggestions, or bug reports:
 - **Author**: Apoorv Kulkarni
-- **Email**: apoorv.kulkarni@dronivo.com
+- **GitHub**: https://ak-apoorvkulkarni.github.io/
 
 ## License
 

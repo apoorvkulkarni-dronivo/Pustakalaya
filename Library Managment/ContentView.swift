@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: https://ak-apoorvkulkarni.github.io/
+//  Portfolio: https://ak-apoorvkulkarni.github.io/
 //  Description: Main content view that displays the tab-based library management interface
 //
 
@@ -17,4 +17,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(LibraryManager())
 }

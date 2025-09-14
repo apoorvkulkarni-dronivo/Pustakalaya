@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: https://ak-apoorvkulkarni.github.io/
+//  Portfolio: https://ak-apoorvkulkarni.github.io/
 //  Description: Main library view displaying all books with search and filter functionality
 //
 
@@ -23,21 +23,20 @@ struct LibraryView: View {
                 
                 // Search and Filter
                 searchAndFilterView
+                    .padding(.top, 24)
                 
                 // Books List
                 booksListView
             }
-            .navigationTitle("My Library")
+            .navigationTitle("Apoorv's Library")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddBook = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                    }
+            .navigationBarItems(
+                trailing: Button(action: { showingAddBook = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.blue)
                 }
-            }
+            )
         }
         .sheet(isPresented: $showingAddBook) {
             AddBookView()
@@ -46,9 +45,8 @@ struct LibraryView: View {
             BookDetailView(book: book)
         }
         .onAppear {
-            if libraryManager.books.isEmpty {
-                libraryManager.addSampleData()
-            }
+            // Sample data is no longer automatically added
+            // Users can manually add books or use the sample data function if needed
         }
     }
     
@@ -104,26 +102,57 @@ struct LibraryView: View {
             .cornerRadius(12)
             
             // Category Filter
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    FilterChip(
-                        title: "All",
-                        isSelected: libraryManager.selectedCategory == nil
-                    ) {
-                        libraryManager.filterByCategory(nil)
-                    }
-                    
-                    ForEach(BookCategory.allCases, id: \.self) { category in
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Categories")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
                         FilterChip(
-                            title: category.rawValue,
-                            isSelected: libraryManager.selectedCategory == category,
-                            color: category.color
+                            title: "All",
+                            isSelected: libraryManager.selectedCategories.isEmpty
                         ) {
-                            libraryManager.filterByCategory(category)
+                            libraryManager.clearAllFilters()
+                        }
+                        
+                        ForEach(BookCategory.allCases, id: \.self) { category in
+                            FilterChip(
+                                title: category.rawValue,
+                                isSelected: libraryManager.selectedCategories.contains(category),
+                                color: category.color
+                            ) {
+                                libraryManager.toggleCategory(category)
+                            }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
+            }
+            
+            // Language Filter
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Languages")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        let languages = ["English", "Marathi", "Hindi", "German"]
+                        ForEach(languages, id: \.self) { language in
+                            FilterChip(
+                                title: language,
+                                isSelected: libraryManager.selectedLanguages.contains(language),
+                                color: languageColor(for: language)
+                            ) {
+                                libraryManager.toggleLanguage(language)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
             }
         }
         .padding(.horizontal)
@@ -134,7 +163,7 @@ struct LibraryView: View {
             if libraryManager.filteredBooks.isEmpty {
                 emptyStateView
             } else {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: true) {
                     LazyVStack(spacing: 12) {
                         ForEach(libraryManager.filteredBooks) { book in
                             BookCard(book: book) {
@@ -180,6 +209,16 @@ struct LibraryView: View {
             Spacer()
         }
         .padding()
+    }
+    
+    private func languageColor(for language: String) -> Color {
+        switch language {
+        case "English": return .blue
+        case "Marathi": return .orange
+        case "Hindi": return .green
+        case "German": return .purple
+        default: return .gray
+        }
     }
 }
 
@@ -254,7 +293,7 @@ struct BookCard: View {
                     } else {
                         Image(systemName: "book.closed")
                             .font(.system(size: 40))
-                            .foregroundColor(book.category.color)
+                            .foregroundColor(book.primaryCategory.color)
                     }
                 }
                 .frame(width: 60, height: 80)
@@ -275,13 +314,28 @@ struct BookCard: View {
                         .lineLimit(1)
                     
                     HStack {
-                        Image(systemName: book.category.icon)
-                            .font(.caption)
-                            .foregroundColor(book.category.color)
-                        
-                        Text(book.category.rawValue)
-                            .font(.caption)
-                            .foregroundColor(book.category.color)
+                        if book.categories.count == 1 {
+                            Image(systemName: book.categories.first!.icon)
+                                .font(.caption)
+                                .foregroundColor(book.categories.first!.color)
+                            
+                            Text(book.categories.first!.rawValue)
+                                .font(.caption)
+                                .foregroundColor(book.categories.first!.color)
+                        } else {
+                            HStack(spacing: 4) {
+                                ForEach(Array(book.categories.prefix(2)), id: \.self) { category in
+                                    Image(systemName: category.icon)
+                                        .font(.caption2)
+                                        .foregroundColor(category.color)
+                                }
+                                if book.categories.count > 2 {
+                                    Text("+\(book.categories.count - 2)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
                         
                         Spacer()
                         

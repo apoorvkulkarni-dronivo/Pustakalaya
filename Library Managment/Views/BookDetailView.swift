@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: https://ak-apoorvkulkarni.github.io/
+//  Portfolio: https://ak-apoorvkulkarni.github.io/
 //  Description: Detailed view for individual books with lending functionality
 //
 
@@ -17,10 +17,11 @@ struct BookDetailView: View {
     @State private var showingLendForm = false
     @State private var showingReturnConfirmation = false
     @State private var showingDeleteConfirmation = false
+    @State private var showingEditForm = false
     
     var body: some View {
         NavigationView {
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 24) {
                     // Cover Image
                     coverImageView
@@ -42,25 +43,24 @@ struct BookDetailView: View {
             }
             .navigationTitle("Book Details")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
+            .navigationBarBackButtonHidden(true)
+            .navigationBarItems(
+                leading: Button("Close") {
+                    dismiss()
+                },
+                trailing: Menu {
+                    Button("Edit Book", action: { showingEditForm = true })
+                    Button("Delete Book", role: .destructive, action: { showingDeleteConfirmation = true })
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button("Edit Book", action: { /* TODO: Implement edit */ })
-                        Button("Delete Book", role: .destructive, action: { showingDeleteConfirmation = true })
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
+            )
         }
         .sheet(isPresented: $showingLendForm) {
             LendBookView(book: book)
+        }
+        .sheet(isPresented: $showingEditForm) {
+            EditBookView(book: book)
         }
         .alert("Return Book", isPresented: $showingReturnConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -95,7 +95,7 @@ struct BookDetailView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "book.closed")
                         .font(.system(size: 80))
-                        .foregroundColor(book.category.color)
+                        .foregroundColor(book.primaryCategory.color)
                     
                     Text("No Cover Image")
                         .font(.subheadline)
@@ -123,20 +123,31 @@ struct BookDetailView: View {
                     .foregroundColor(.secondary)
             }
             
-            // Category Badge
-            HStack {
-                Image(systemName: book.category.icon)
-                    .foregroundColor(book.category.color)
+            // Categories
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Categories")
+                    .font(.headline)
+                    .foregroundColor(.primary)
                 
-                Text(book.category.rawValue)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(book.category.color)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
+                    ForEach(book.categories, id: \.self) { category in
+                        HStack(spacing: 6) {
+                            Image(systemName: category.icon)
+                                .font(.caption)
+                                .foregroundColor(category.color)
+                            
+                            Text(category.rawValue)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(category.color)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(category.color.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(book.category.color.opacity(0.1))
-            .cornerRadius(20)
             
             // Book Details Grid
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
@@ -291,7 +302,7 @@ struct LendBookView: View {
     
     @State private var borrowerName = ""
     @State private var borrowerContact = ""
-    @State private var expectedReturnDate = Date().addingTimeInterval(30 * 24 * 60 * 60) // 30 days from now
+    @State private var expectedReturnDate: Date? = nil
     @State private var notes = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
@@ -305,10 +316,6 @@ struct LendBookView: View {
                         .keyboardType(.phonePad)
                 }
                 
-                Section("Return Information") {
-                    DatePicker("Expected Return Date", selection: $expectedReturnDate, displayedComponents: .date)
-                }
-                
                 Section("Notes") {
                     TextField("Additional notes (Optional)", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
@@ -316,21 +323,17 @@ struct LendBookView: View {
             }
             .navigationTitle("Lend Book")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            .navigationBarBackButtonHidden(true)
+            .navigationBarItems(
+                leading: Button("Cancel") {
+                    dismiss()
+                },
+                trailing: Button("Lend") {
+                    lendBook()
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Lend") {
-                        lendBook()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(borrowerName.isEmpty)
-                }
-            }
+                .fontWeight(.semibold)
+                .disabled(borrowerName.isEmpty)
+            )
         }
         .alert("Error", isPresented: $showingAlert) {
             Button("OK") { }
@@ -344,7 +347,7 @@ struct LendBookView: View {
             book,
             to: borrowerName,
             contact: borrowerContact.isEmpty ? nil : borrowerContact,
-            expectedReturn: expectedReturnDate,
+            expectedReturn: nil,
             notes: notes.isEmpty ? nil : notes
         )
         dismiss()
@@ -360,6 +363,6 @@ extension DateFormatter {
 }
 
 #Preview {
-    BookDetailView(book: Book(title: "Sample Book", author: "Sample Author", language: "English", category: .fiction, numberOfPages: 300))
+    BookDetailView(book: Book(title: "Sample Book", author: "Sample Author", language: "English", categories: [.fiction], numberOfPages: 300))
         .environmentObject(LibraryManager())
 }

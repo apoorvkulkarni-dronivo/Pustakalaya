@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: https://ak-apoorvkulkarni.github.io/
+//  Portfolio: https://ak-apoorvkulkarni.github.io/
 //  Description: Data model for Book entity with all required properties
 //
 
@@ -15,7 +15,7 @@ struct Book: Identifiable, Codable {
     var title: String
     var author: String
     var language: String
-    var category: BookCategory
+    var categories: [BookCategory]
     var numberOfPages: Int
     var isbn: String?
     var coverImage: Data?
@@ -23,18 +23,23 @@ struct Book: Identifiable, Codable {
     var isLent: Bool
     var lendingRecord: LendingRecord?
     
-    init(title: String, author: String, language: String, category: BookCategory, numberOfPages: Int, isbn: String? = nil, coverImage: Data? = nil) {
+    init(title: String, author: String, language: String, categories: [BookCategory], numberOfPages: Int, isbn: String? = nil, coverImage: Data? = nil) {
         self.id = UUID()
         self.title = title
         self.author = author
         self.language = language
-        self.category = category
+        self.categories = categories
         self.numberOfPages = numberOfPages
         self.isbn = isbn
         self.coverImage = coverImage
         self.dateAdded = Date()
         self.isLent = false
         self.lendingRecord = nil
+    }
+    
+    // Computed property for backward compatibility and display
+    var primaryCategory: BookCategory {
+        return categories.first ?? .other
     }
 }
 

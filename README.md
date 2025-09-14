@@ -165,7 +165,7 @@ Planned features for future updates:
 
 For questions, suggestions, or bug reports:
 - **Author**: Apoorv Kulkarni
-- **GitHub**: https://ak-apoorvkulkarni.github.io/
+- **Portfolio**: https://ak-apoorvkulkarni.github.io/
 
 ## License
 

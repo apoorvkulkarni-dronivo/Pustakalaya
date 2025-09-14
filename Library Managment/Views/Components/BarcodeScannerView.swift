@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: https://ak-apoorvkulkarni.github.io/
+//  Portfolio: https://ak-apoorvkulkarni.github.io/
 //  Description: Barcode scanner component for book ISBN scanning
 //
 
@@ -98,24 +98,68 @@ class ISBNScannerViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        setupCamera()
+        checkCameraPermission()
+    }
+    
+    private func checkCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            setupCamera()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.setupCamera()
+                    } else {
+                        self?.showPermissionDeniedAlert()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showPermissionDeniedAlert()
+        @unknown default:
+            showPermissionDeniedAlert()
+        }
+    }
+    
+    private func showPermissionDeniedAlert() {
+        let alert = UIAlertController(
+            title: "Camera Access Required",
+            message: "Please enable camera access in Settings to scan barcodes.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Settings", style: .default) { _ in
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsURL)
+            }
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
+            self?.delegate?.didFailToScan()
+        })
+        present(alert, animated: true)
     }
     
     private func setupCamera() {
         captureSession = AVCaptureSession()
         
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else { return }
+        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+            showErrorAlert(message: "Camera not available")
+            return
+        }
+        
         let videoInput: AVCaptureDeviceInput
         
         do {
             videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
         } catch {
+            showErrorAlert(message: "Failed to initialize camera: \(error.localizedDescription)")
             return
         }
         
         if captureSession.canAddInput(videoInput) {
             captureSession.addInput(videoInput)
         } else {
+            showErrorAlert(message: "Cannot add camera input")
             return
         }
         
@@ -125,8 +169,9 @@ class ISBNScannerViewController: UIViewController {
             captureSession.addOutput(metadataOutput)
             
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-            metadataOutput.metadataObjectTypes = [.ean8, .ean13, .pdf417, .code128]
+            metadataOutput.metadataObjectTypes = [.ean8, .ean13, .pdf417, .code128, .qr]
         } else {
+            showErrorAlert(message: "Cannot add metadata output")
             return
         }
         
@@ -135,8 +180,14 @@ class ISBNScannerViewController: UIViewController {
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
         
-        captureSession.startRunning()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.captureSession.startRunning()
+        }
         
+        setupUI()
+    }
+    
+    private func setupUI() {
         // Add cancel button
         let cancelButton = UIButton(type: .system)
         cancelButton.setTitle("Cancel", for: .normal)
@@ -147,12 +198,41 @@ class ISBNScannerViewController: UIViewController {
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(cancelButton)
         
+        // Add instruction label
+        let instructionLabel = UILabel()
+        instructionLabel.text = "Point camera at barcode to scan"
+        instructionLabel.textColor = .white
+        instructionLabel.textAlignment = .center
+        instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        instructionLabel.layer.cornerRadius = 8
+        instructionLabel.clipsToBounds = true
+        instructionLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(instructionLabel)
+        
         NSLayoutConstraint.activate([
             cancelButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
             cancelButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             cancelButton.widthAnchor.constraint(equalToConstant: 80),
-            cancelButton.heightAnchor.constraint(equalToConstant: 40)
+            cancelButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -50),
+            instructionLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
+            instructionLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20)
         ])
+    }
+    
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Camera Error",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.delegate?.didFailToScan()
+        })
+        present(alert, animated: true)
     }
     
     @objc private func cancelTapped() {
@@ -162,30 +242,54 @@ class ISBNScannerViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        if captureSession?.isRunning == false {
-            captureSession.startRunning()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            if self?.captureSession?.isRunning == false {
+                self?.captureSession?.startRunning()
+            }
         }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
-        if captureSession?.isRunning == true {
-            captureSession.stopRunning()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            if self?.captureSession?.isRunning == true {
+                self?.captureSession?.stopRunning()
+            }
         }
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.layer.bounds
     }
 }
 
 extension ISBNScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        captureSession.stopRunning()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.captureSession?.stopRunning()
+        }
         
         if let metadataObject = metadataObjects.first {
             guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
             guard let stringValue = readableObject.stringValue else { return }
+            
+            // Play haptic feedback
             AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
             
-            delegate?.didScanISBN(stringValue)
+            // Validate ISBN format (basic check)
+            let cleanedISBN = stringValue.replacingOccurrences(of: "-", with: "").replacingOccurrences(of: " ", with: "")
+            if cleanedISBN.count == 10 || cleanedISBN.count == 13 {
+                DispatchQueue.main.async { [weak self] in
+                    self?.delegate?.didScanISBN(stringValue)
+                }
+            } else {
+                // If not a valid ISBN format, restart scanning
+                DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    self?.captureSession?.startRunning()
+                }
+            }
         }
     }
 }

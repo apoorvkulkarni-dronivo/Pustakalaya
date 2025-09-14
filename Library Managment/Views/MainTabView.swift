@@ -3,7 +3,7 @@
 //  Library Managment
 //
 //  Author: Apoorv Kulkarni
-//  Email: https://ak-apoorvkulkarni.github.io/
+//  Portfolio: https://ak-apoorvkulkarni.github.io/
 //  Description: Main tab navigation structure for the library management app
 //
 
@@ -18,6 +18,13 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: "books.vertical")
                     Text("Library")
+                }
+                .environmentObject(libraryManager)
+            
+            WishlistView()
+                .tabItem {
+                    Image(systemName: "heart")
+                    Text("Wishlist")
                 }
                 .environmentObject(libraryManager)
             
@@ -63,7 +70,7 @@ struct StatisticsView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 24) {
                     // Overview Stats
                     VStack(spacing: 16) {
@@ -96,7 +103,7 @@ struct StatisticsView: View {
                             
                             StatisticCard(
                                 title: "Categories",
-                                value: "\(Set(libraryManager.books.map { $0.category }).count)",
+                                value: "\(Set(libraryManager.books.flatMap { $0.categories }).count)",
                                 icon: "tag.fill",
                                 color: .purple
                             )
@@ -111,11 +118,31 @@ struct StatisticsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
                         ForEach(BookCategory.allCases, id: \.self) { category in
-                            let categoryBooks = libraryManager.books.filter { $0.category == category }
+                            let categoryBooks = libraryManager.books.filter { $0.categories.contains(category) }
                             if !categoryBooks.isEmpty {
                                 CategoryStatRow(
                                     category: category,
                                     count: categoryBooks.count,
+                                    total: libraryManager.books.count
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Language Breakdown
+                    VStack(spacing: 16) {
+                        Text("Books by Language")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        let languages = ["English", "Marathi", "Hindi", "German"]
+                        ForEach(languages, id: \.self) { language in
+                            let languageBooks = libraryManager.books.filter { $0.language == language }
+                            if !languageBooks.isEmpty {
+                                LanguageStatRow(
+                                    language: language,
+                                    count: languageBooks.count,
                                     total: libraryManager.books.count
                                 )
                             }
@@ -217,6 +244,71 @@ struct CategoryStatRow: View {
     }
 }
 
+struct LanguageStatRow: View {
+    let language: String
+    let count: Int
+    let total: Int
+    
+    private var percentage: Double {
+        total > 0 ? Double(count) / Double(total) : 0
+    }
+    
+    private var languageColor: Color {
+        switch language {
+        case "English": return .blue
+        case "Marathi": return .orange
+        case "Hindi": return .green
+        case "German": return .purple
+        default: return .gray
+        }
+    }
+    
+    private var languageIcon: String {
+        switch language {
+        case "English": return "globe.americas"
+        case "Marathi": return "globe.asia.australia"
+        case "Hindi": return "globe.asia.australia"
+        case "German": return "globe.europe.africa"
+        default: return "globe"
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: languageIcon)
+                .font(.title2)
+                .foregroundColor(languageColor)
+                .frame(width: 30)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(language)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Text("\(count) book\(count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(Int(percentage * 100))%")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                ProgressView(value: percentage)
+                    .progressViewStyle(LinearProgressViewStyle(tint: languageColor))
+                    .frame(width: 60)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+}
+
 struct RecentActivityRow: View {
     let book: Book
     
@@ -231,7 +323,7 @@ struct RecentActivityRow: View {
                 } else {
                     Image(systemName: "book.closed")
                         .font(.title2)
-                        .foregroundColor(book.category.color)
+                        .foregroundColor(book.primaryCategory.color)
                 }
             }
             .frame(width: 40, height: 50)
@@ -263,66 +355,6 @@ struct RecentActivityRow: View {
     }
 }
 
-struct SettingsView: View {
-    @EnvironmentObject var libraryManager: LibraryManager
-    @State private var showingExportAlert = false
-    @State private var showingImportAlert = false
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section("Library Management") {
-                    Button("Add Sample Data") {
-                        libraryManager.addSampleData()
-                    }
-                    
-                    Button("Clear All Books") {
-                        // TODO: Implement clear all functionality
-                    }
-                    .foregroundColor(.red)
-                }
-                
-                Section("Data") {
-                    Button("Export Library") {
-                        showingExportAlert = true
-                    }
-                    
-                    Button("Import Library") {
-                        showingImportAlert = true
-                    }
-                }
-                
-                Section("About") {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Text("Total Books")
-                        Spacer()
-                        Text("\(libraryManager.books.count)")
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
-        }
-        .alert("Export Library", isPresented: $showingExportAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Library export functionality will be implemented in a future update.")
-        }
-        .alert("Import Library", isPresented: $showingImportAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Library import functionality will be implemented in a future update.")
-        }
-    }
-}
 
 extension DateFormatter {
     static let relativeDate: DateFormatter = {

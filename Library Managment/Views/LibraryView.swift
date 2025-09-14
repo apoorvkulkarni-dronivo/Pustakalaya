@@ -88,7 +88,7 @@ struct LibraryView: View {
                 
                 TextField("Search books...", text: $searchText)
                     .textFieldStyle(PlainTextFieldStyle())
-                    .onChange(of: searchText) { newValue in
+                    .onChange(of: searchText) { _, newValue in
                         libraryManager.searchBooks(query: newValue)
                     }
                 

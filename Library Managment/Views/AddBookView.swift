@@ -217,7 +217,7 @@ struct AddBookView: View {
         .sheet(isPresented: $showingScanner) {
             ISBNScannerView(isPresented: $showingScanner, scannedISBN: $isbn)
         }
-        .onChange(of: selectedPhotoItem) { newItem in
+        .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
                 if let data = try? await newItem?.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {

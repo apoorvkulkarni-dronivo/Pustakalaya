@@ -11,7 +11,7 @@ import Foundation
 import SwiftUI
 
 struct Book: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     var title: String
     var author: String
     var language: String
@@ -24,6 +24,7 @@ struct Book: Identifiable, Codable {
     var lendingRecord: LendingRecord?
     
     init(title: String, author: String, language: String, category: BookCategory, numberOfPages: Int, isbn: String? = nil, coverImage: Data? = nil) {
+        self.id = UUID()
         self.title = title
         self.author = author
         self.language = language
@@ -96,7 +97,7 @@ enum BookCategory: String, CaseIterable, Codable {
 }
 
 struct LendingRecord: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     var borrowerName: String
     var borrowerContact: String?
     var dateLent: Date
@@ -106,6 +107,7 @@ struct LendingRecord: Identifiable, Codable {
     var dateReturned: Date?
     
     init(borrowerName: String, borrowerContact: String? = nil, expectedReturnDate: Date? = nil, notes: String? = nil) {
+        self.id = UUID()
         self.borrowerName = borrowerName
         self.borrowerContact = borrowerContact
         self.dateLent = Date()

@@ -2,7 +2,9 @@
 //  Library_ManagmentApp.swift
 //  Library Managment
 //
-//  Created by Apoorv Kulkarni on 14.09.25.
+//  Author: Apoorv Kulkarni
+//  Email: apoorv.kulkarni@dronivo.com
+//  Description: Main app entry point for the Personal Library Management iOS application
 //
 
 import SwiftUI
@@ -12,6 +14,7 @@ struct Library_ManagmentApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.light) // Force light mode for consistent design
         }
     }
 }

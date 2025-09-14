@@ -2,20 +2,16 @@
 //  ContentView.swift
 //  Library Managment
 //
-//  Created by Apoorv Kulkarni on 14.09.25.
+//  Author: Apoorv Kulkarni
+//  Email: apoorv.kulkarni@dronivo.com
+//  Description: Main content view that displays the tab-based library management interface
 //
 
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        MainTabView()
     }
 }
 

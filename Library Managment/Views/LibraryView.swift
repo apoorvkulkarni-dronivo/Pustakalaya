@@ -17,16 +17,18 @@ struct LibraryView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Header Stats
-                headerStatsView
-                
-                // Search and Filter
-                searchAndFilterView
-                    .padding(.top, 24)
-                
-                // Books List
-                booksListView
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 0) {
+                    // Header Stats
+                    headerStatsView
+                    
+                    // Search and Filter
+                    searchAndFilterView
+                        .padding(.top, 24)
+                    
+                    // Books List
+                    booksListView
+                }
             }
             .navigationTitle("Apoorv's Library")
             .navigationBarTitleDisplayMode(.large)
@@ -163,17 +165,15 @@ struct LibraryView: View {
             if libraryManager.filteredBooks.isEmpty {
                 emptyStateView
             } else {
-                ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(spacing: 12) {
-                        ForEach(libraryManager.filteredBooks) { book in
-                            BookCard(book: book) {
-                                showingBookDetail = book
-                            }
+                LazyVStack(spacing: 12) {
+                    ForEach(libraryManager.filteredBooks) { book in
+                        BookCard(book: book) {
+                            showingBookDetail = book
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 100)
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 100)
             }
         }
     }

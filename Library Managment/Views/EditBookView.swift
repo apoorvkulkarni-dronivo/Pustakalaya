@@ -250,47 +250,27 @@ struct EditBookView: View {
     private var formFieldsSection: some View {
         VStack(spacing: 20) {
             // Title
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Title")
-                    .font(.headline)
-                CustomTextField(title: "Title", text: $title, placeholder: "Enter book title")
-            }
+            CustomTextField(title: "Title", text: $title, placeholder: "Enter book title")
             
             // Author
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Author")
-                    .font(.headline)
-                CustomTextField(title: "Author", text: $author, placeholder: "Enter author name")
-            }
+            CustomTextField(title: "Author", text: $author, placeholder: "Enter author name")
             
             // Language
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Language")
-                    .font(.headline)
-                CustomTextField(title: "Language", text: $language, placeholder: "Enter language")
-            }
+            CustomTextField(title: "Language", text: $language, placeholder: "Enter language")
             
             // Number of Pages
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Number of Pages")
-                    .font(.headline)
-                CustomTextField(title: "Pages", text: $numberOfPages, placeholder: "Enter number of pages")
-                    .keyboardType(.numberPad)
-            }
+            CustomTextField(title: "Number of Pages", text: $numberOfPages, placeholder: "Enter number of pages")
+                .keyboardType(.numberPad)
             
             // ISBN
-            VStack(alignment: .leading, spacing: 8) {
-                Text("ISBN (Optional)")
-                    .font(.headline)
-                CustomTextField(
-                    title: "ISBN",
-                    text: Binding(
-                        get: { isbn ?? "" },
-                        set: { isbn = $0.isEmpty ? nil : $0 }
-                    ),
-                    placeholder: "Enter ISBN"
-                )
-            }
+            CustomTextField(
+                title: "ISBN (Optional)",
+                text: Binding(
+                    get: { isbn ?? "" },
+                    set: { isbn = $0.isEmpty ? nil : $0 }
+                ),
+                placeholder: "Enter ISBN"
+            )
             
             // Categories
             VStack(alignment: .leading, spacing: 8) {

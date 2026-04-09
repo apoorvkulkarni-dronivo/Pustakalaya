@@ -22,14 +22,32 @@ export function IsbnScannerModal({ open, onClose, onIsbn }: Props) {
 
     const run = async () => {
       try {
-        const { Html5Qrcode } = await import('html5-qrcode');
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
         if (!aliveRef.current) return;
-        const qr = new Html5Qrcode(elId);
+        const qr = new Html5Qrcode(elId, {
+          verbose: false,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.QR_CODE,
+          ],
+          useBarCodeDetectorIfSupported: true,
+        });
         qrRef.current = qr;
         if (!aliveRef.current) return;
         await qr.start(
           { facingMode: 'environment' },
-          { fps: 8, qrbox: { width: 280, height: 140 } },
+          {
+            fps: 10,
+            qrbox: (vw, vh) => ({
+              width: Math.min(320, Math.floor(vw * 0.92)),
+              height: Math.min(160, Math.floor(vh * 0.35)),
+            }),
+          },
           (decoded) => {
             const cleaned = decoded.replace(/-/g, '').replace(/\s/g, '');
             if (validateIsbnDigits(cleaned)) {

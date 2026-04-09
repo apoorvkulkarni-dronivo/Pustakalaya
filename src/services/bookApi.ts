@@ -17,6 +17,30 @@ function cleanIsbn(isbn: string): string {
   return isbn.replace(/-/g, '').replace(/\s/g, '');
 }
 
+/** ISBN-10 check digit may be X; normalize for validation. */
+function normalizeIsbnDigits(isbn: string): string {
+  const d = cleanIsbn(isbn);
+  if (d.length === 10 && /x$/i.test(d)) {
+    return d.slice(0, 9) + 'X';
+  }
+  return d;
+}
+
+/** Convert ISBN-10 body to EAN-13 (978 prefix) for Open Library lookups. */
+function isbn10ToIsbn13(isbn10: string): string | null {
+  const d = normalizeIsbnDigits(isbn10);
+  if (d.length !== 10) return null;
+  const body = d.slice(0, 9);
+  if (!/^\d{9}$/.test(body)) return null;
+  const core = `978${body}`;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(core[i]!, 10) * (i % 2 === 0 ? 1 : 3);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return `${core}${check}`;
+}
+
 function suggestCategories(book: BookDetails): BookDetails {
   const text = `${book.title} ${book.author} ${book.description ?? ''}`.toLowerCase();
   const suggested: BookCategory[] = [];
@@ -144,6 +168,7 @@ interface OpenLibDesc {
 interface OpenLibResponse {
   title?: string;
   authors?: OpenLibAuthor[];
+  works?: { key?: string }[];
   languages?: { key?: string }[];
   number_of_pages?: number;
   numberOfPages?: number;
@@ -154,29 +179,91 @@ interface OpenLibResponse {
   cover?: { small?: string; medium?: string; large?: string };
 }
 
-async function fetchOpenLibrary(isbn: string): Promise<BookDetails | null> {
-  const url = `https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`;
+interface OpenLibSearchDoc {
+  title?: string;
+  author_name?: string | string[];
+  cover_i?: number;
+  number_of_pages_median?: number;
+  first_publish_year?: number;
+  publisher?: string[];
+}
+
+async function fetchOpenLibrarySearch(isbn: string): Promise<BookDetails | null> {
+  const url = `https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}`;
   const res = await fetch(url);
   if (!res.ok) return null;
-  const data = (await res.json()) as OpenLibResponse;
+  const json = (await res.json()) as { docs?: OpenLibSearchDoc[] };
+  const doc = json.docs?.[0];
+  if (!doc?.title) return null;
+  const authorRaw = doc.author_name;
+  const author = Array.isArray(authorRaw)
+    ? authorRaw.join(', ')
+    : (authorRaw ?? 'Unknown Author');
+  const coverUrl =
+    doc.cover_i != null ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : null;
+  const base: BookDetails = {
+    title: doc.title,
+    author,
+    language: 'English',
+    numberOfPages: doc.number_of_pages_median ?? 0,
+    isbn,
+    description: null,
+    publishDate: doc.first_publish_year != null ? String(doc.first_publish_year) : null,
+    publisher: doc.publisher?.[0] ?? null,
+    coverImageURL: coverUrl,
+    suggestedCategories: [],
+  };
+  return suggestCategories(base);
+}
 
-  let author = 'Unknown Author';
+async function resolveOpenLibraryAuthor(data: OpenLibResponse): Promise<string> {
   if (data.authors?.length) {
-    const a = data.authors[0];
-    if (a.name) {
-      author = a.name;
-    } else if (a.key) {
+    const a = data.authors[0]!;
+    if (a.name) return a.name;
+    if (a.key) {
       try {
         const ar = await fetch(`https://openlibrary.org${a.key}.json`);
         if (ar.ok) {
           const aj = (await ar.json()) as { name?: string };
-          if (aj.name) author = aj.name;
+          if (aj.name) return aj.name;
         }
       } catch {
         /* ignore */
       }
     }
   }
+  const wk = data.works?.[0]?.key;
+  if (wk) {
+    try {
+      const wr = await fetch(`https://openlibrary.org${wk}.json`);
+      if (wr.ok) {
+        const wj = (await wr.json()) as {
+          authors?: { author?: { key?: string } }[];
+        };
+        const ak = wj.authors?.[0]?.author?.key;
+        if (ak) {
+          const ar = await fetch(`https://openlibrary.org${ak}.json`);
+          if (ar.ok) {
+            const aj = (await ar.json()) as { name?: string };
+            if (aj.name) return aj.name;
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return 'Unknown Author';
+}
+
+async function fetchOpenLibraryEdition(isbn: string): Promise<BookDetails | null> {
+  const url = `https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = (await res.json()) as OpenLibResponse;
+  if (!data.title) return null;
+
+  const author = await resolveOpenLibraryAuthor(data);
 
   const lang =
     data.languages?.[0]?.key?.replace('/languages/', '').toUpperCase() ?? 'English';
@@ -187,8 +274,10 @@ async function fetchOpenLibrary(isbn: string): Promise<BookDetails | null> {
     description = data.description.value ?? data.description.string ?? null;
   }
 
-  const coverUrl =
-    data.cover?.large ?? data.cover?.medium ?? data.cover?.small ?? null;
+  let coverUrl = data.cover?.large ?? data.cover?.medium ?? data.cover?.small ?? null;
+  if (!coverUrl && data.covers?.[0] != null) {
+    coverUrl = `https://covers.openlibrary.org/b/id/${data.covers[0]}-L.jpg`;
+  }
 
   const base: BookDetails = {
     title: data.title ?? 'Unknown Title',
@@ -203,6 +292,12 @@ async function fetchOpenLibrary(isbn: string): Promise<BookDetails | null> {
     suggestedCategories: [],
   };
   return suggestCategories(base);
+}
+
+async function fetchOpenLibrary(isbn: string): Promise<BookDetails | null> {
+  const edition = await fetchOpenLibraryEdition(isbn);
+  if (edition) return edition;
+  return fetchOpenLibrarySearch(isbn);
 }
 
 interface GoogleBooksResponse {
@@ -220,8 +315,17 @@ interface GoogleBooksResponse {
   }[];
 }
 
+function googleBooksApiKey(): string | undefined {
+  const raw = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
 async function fetchGoogleBooks(isbn: string): Promise<BookDetails | null> {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`;
+  const key = googleBooksApiKey();
+  const q = encodeURIComponent(isbn);
+  const url = key
+    ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${q}&key=${encodeURIComponent(key)}`
+    : `https://www.googleapis.com/books/v1/volumes?q=isbn:${q}`;
   const res = await fetch(url);
   if (!res.ok) return null;
   const data = (await res.json()) as GoogleBooksResponse;
@@ -246,25 +350,38 @@ async function fetchGoogleBooks(isbn: string): Promise<BookDetails | null> {
 }
 
 export async function fetchBookDetails(isbn: string): Promise<BookDetails | null> {
-  const clean = cleanIsbn(isbn);
-  try {
-    const ol = await fetchOpenLibrary(clean);
-    if (ol) return ol;
-  } catch {
-    /* try google */
+  const clean = normalizeIsbnDigits(isbn);
+  const variants: string[] = [clean];
+  if (clean.length === 10) {
+    const as13 = isbn10ToIsbn13(clean);
+    if (as13 && !variants.includes(as13)) variants.push(as13);
   }
-  try {
-    const gb = await fetchGoogleBooks(clean);
-    if (gb) return gb;
-  } catch {
-    /* */
+
+  for (const v of variants) {
+    try {
+      const ol = await fetchOpenLibrary(v);
+      if (ol) return { ...ol, isbn: v };
+    } catch {
+      /* try next */
+    }
+  }
+
+  for (const v of variants) {
+    try {
+      const gb = await fetchGoogleBooks(v);
+      if (gb) return { ...gb, isbn: v };
+    } catch {
+      /* */
+    }
   }
   return null;
 }
 
 export function validateIsbnDigits(s: string): boolean {
-  const d = cleanIsbn(s);
-  return d.length === 10 || d.length === 13;
+  const d = normalizeIsbnDigits(s);
+  if (d.length === 13) return /^\d{13}$/.test(d);
+  if (d.length === 10) return /^\d{9}[\dX]$/.test(d);
+  return false;
 }
 
 export async function urlToCompressedBlob(

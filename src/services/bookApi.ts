@@ -349,6 +349,20 @@ async function fetchGoogleBooks(isbn: string): Promise<BookDetails | null> {
   return suggestCategories(base);
 }
 
+/** Shown when Open Library + Google Books have no usable match (new/rare ISBNs, or Google quota). */
+export function isbnLookupNotFoundMessage(rawIsbn: string): string {
+  const clean = normalizeIsbnDigits(rawIsbn.replace(/[^\dX]/gi, ''));
+  return [
+    `No automatic match for ISBN ${clean || rawIsbn}.`,
+    '',
+    'Open Library (free) does not list this edition yet—very common for new releases or some regional prints.',
+    '',
+    'You can still type the title and author below and save the book.',
+    '',
+    'Optional: add a Google Books API key as VITE_GOOGLE_BOOKS_API_KEY (repo secret on GitHub + .env locally) for more auto-fill results.',
+  ].join('\n');
+}
+
 export async function fetchBookDetails(isbn: string): Promise<BookDetails | null> {
   const clean = normalizeIsbnDigits(isbn);
   const variants: string[] = [clean];

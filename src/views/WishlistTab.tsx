@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useLibrary } from '../context/LibraryContext';
 import type { WishlistItem } from '../types';
-import { fetchBookDetails, fileToCompressedBlob, urlToCompressedBlob } from '../services/bookApi';
+import {
+  fetchBookDetails,
+  fileToCompressedBlob,
+  isbnLookupNotFoundMessage,
+  urlToCompressedBlob,
+} from '../services/bookApi';
 import { IsbnScannerModal } from '../components/IsbnScannerModal';
 import { BookThumbFallback, IcoPlus } from '../components/AppIcons';
 
@@ -139,7 +144,7 @@ function QuickWishlistModal({ onClose, onSaved }: { onClose: () => void; onSaved
           }
         }
       } else {
-        setAlertMsg(`No book data found for ISBN: ${raw}`);
+        setAlertMsg(isbnLookupNotFoundMessage(raw));
       }
     } catch {
       setAlertMsg('Failed to fetch book data.');
@@ -268,8 +273,8 @@ function QuickWishlistModal({ onClose, onSaved }: { onClose: () => void; onSaved
 
       {alertMsg && (
         <div className="modal-backdrop sub" onClick={() => setAlertMsg(null)}>
-          <div className="modal tiny" onClick={(e) => e.stopPropagation()}>
-            <p>{alertMsg}</p>
+          <div className="modal tiny modal-tiny-wide" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-alert-msg">{alertMsg}</p>
             <button type="button" className="btn-primary full" onClick={() => setAlertMsg(null)}>
               OK
             </button>

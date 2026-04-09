@@ -373,6 +373,19 @@ html {
   max-width: 320px;
 }
 
+.modal-tiny-wide {
+  max-width: min(400px, 92vw);
+}
+
+.modal-alert-msg {
+  margin: 0 0 12px;
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  color: var(--ink, #1a1f2e);
+}
+
 .modal-head {
   display: flex;
   align-items: center;

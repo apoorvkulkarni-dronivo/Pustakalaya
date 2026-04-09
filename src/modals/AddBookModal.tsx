@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   fetchBookDetails,
   fileToCompressedBlob,
+  isbnLookupNotFoundMessage,
   urlToCompressedBlob,
 } from '../services/bookApi';
 import type { BookCategory } from '../types';
@@ -109,7 +110,7 @@ export function AddBookModal({ open, onClose }: Props) {
           }
         }
       } else {
-        setAlertMsg(`No book data found for ISBN: ${raw}`);
+        setAlertMsg(isbnLookupNotFoundMessage(raw));
       }
     } catch {
       setAlertMsg('Failed to fetch book data.');
@@ -305,8 +306,8 @@ export function AddBookModal({ open, onClose }: Props) {
 
       {alertMsg && (
         <div className="modal-backdrop sub" onClick={() => setAlertMsg(null)}>
-          <div className="modal tiny" onClick={(e) => e.stopPropagation()}>
-            <p>{alertMsg}</p>
+          <div className="modal tiny modal-tiny-wide" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-alert-msg">{alertMsg}</p>
             <button type="button" className="btn-primary full" onClick={() => setAlertMsg(null)}>
               OK
             </button>

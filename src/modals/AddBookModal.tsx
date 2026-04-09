@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
   fetchBookDetails,
+  fetchBookDetailsByTitleAuthor,
   fileToCompressedBlob,
   isbnLookupNotFoundMessage,
+  titleAuthorLookupNotFoundMessage,
   urlToCompressedBlob,
 } from '../services/bookApi';
+import type { BookDetails } from '../services/bookApi';
 import type { BookCategory } from '../types';
 import { BOOK_CATEGORY_LABELS, BOOK_CATEGORY_ORDER } from '../types';
 import { useLibrary } from '../context/LibraryContext';
@@ -24,7 +27,7 @@ const initialForm = () => ({
   isbn: '',
   coverPreview: null as string | null,
   coverBlob: null as Blob | null,
-  fetched: null as Awaited<ReturnType<typeof fetchBookDetails>> | null,
+  fetched: null as BookDetails | null,
 });
 
 export function AddBookModal({ open, onClose }: Props) {
@@ -40,7 +43,7 @@ export function AddBookModal({ open, onClose }: Props) {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState<Awaited<ReturnType<typeof fetchBookDetails>> | null>(null);
+  const [fetched, setFetched] = useState<BookDetails | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
@@ -111,6 +114,40 @@ export function AddBookModal({ open, onClose }: Props) {
         }
       } else {
         setAlertMsg(isbnLookupNotFoundMessage(raw));
+      }
+    } catch {
+      setAlertMsg('Failed to fetch book data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFromTitleAuthor = async () => {
+    const t = title.trim();
+    const a = author.trim();
+    setLoading(true);
+    setFetched(null);
+    try {
+      const d = await fetchBookDetailsByTitleAuthor(t, a);
+      if (d) {
+        setFetched(d);
+        setTitle(d.title);
+        setAuthor(d.author);
+        setLanguage(d.language.length > 2 ? d.language : 'English');
+        setNumberOfPages(String(d.numberOfPages));
+        if (d.isbn) setIsbn(d.isbn.replace(/[^\dX]/gi, ''));
+        if (d.suggestedCategories.length) {
+          setSelectedCategories(new Set(d.suggestedCategories));
+        }
+        if (d.coverImageURL) {
+          const blob = await urlToCompressedBlob(d.coverImageURL);
+          if (blob) {
+            setCoverBlob(blob);
+            setCoverPreview(URL.createObjectURL(blob));
+          }
+        }
+      } else {
+        setAlertMsg(titleAuthorLookupNotFoundMessage(t, a));
       }
     } catch {
       setAlertMsg('Failed to fetch book data.');
@@ -209,6 +246,36 @@ export function AddBookModal({ open, onClose }: Props) {
             )}
           </div>
 
+          <div className="form-block">
+            <label className="label">Book title</label>
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="form-block">
+            <label className="label">Author</label>
+            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} />
+          </div>
+          <div className="form-block">
+            <label className="label">Look up without ISBN</label>
+            <p className="muted small">
+              If Open Library or Google Books lists this edition, we fill pages, language, cover, and ISBN when
+              available.
+            </p>
+            <button
+              type="button"
+              className="btn-secondary full mt"
+              disabled={loading || !title.trim() || !author.trim()}
+              onClick={() => void loadFromTitleAuthor()}
+            >
+              {loading ? 'Fetching book data…' : 'Fill from title & author'}
+            </button>
+          </div>
+
+          {fetched && (
+            <div className="form-block">
+              <div className="success-banner small">Book data found — fields updated below.</div>
+            </div>
+          )}
+
           <div className="form-block isbn-block">
             <label className="label">ISBN — scan or lookup</label>
             <div className="row gap">
@@ -235,19 +302,8 @@ export function AddBookModal({ open, onClose }: Props) {
             >
               {loading ? 'Fetching book data…' : 'Scan ISBN barcode'}
             </button>
-            {fetched && (
-              <div className="success-banner small mt">Book data found — fields updated below.</div>
-            )}
           </div>
 
-          <div className="form-block">
-            <label className="label">Book title</label>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div className="form-block">
-            <label className="label">Author</label>
-            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} />
-          </div>
           <div className="form-block">
             <label className="label">Language</label>
             <select

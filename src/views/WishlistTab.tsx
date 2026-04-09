@@ -3,8 +3,10 @@ import { useLibrary } from '../context/LibraryContext';
 import type { WishlistItem } from '../types';
 import {
   fetchBookDetails,
+  fetchBookDetailsByTitleAuthor,
   fileToCompressedBlob,
   isbnLookupNotFoundMessage,
+  titleAuthorLookupNotFoundMessage,
   urlToCompressedBlob,
 } from '../services/bookApi';
 import { IsbnScannerModal } from '../components/IsbnScannerModal';
@@ -123,16 +125,16 @@ function QuickWishlistModal({ onClose, onSaved }: { onClose: () => void; onSaved
   const [loading, setLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
-  const [fetchedFromIsbn, setFetchedFromIsbn] = useState(false);
+  const [fetchedFromCatalog, setFetchedFromCatalog] = useState(false);
 
   const loadFromIsbn = async (raw: string) => {
     setIsbn(raw.replace(/[^\dX]/gi, ''));
     setLoading(true);
-    setFetchedFromIsbn(false);
+    setFetchedFromCatalog(false);
     try {
       const d = await fetchBookDetails(raw);
       if (d) {
-        setFetchedFromIsbn(true);
+        setFetchedFromCatalog(true);
         setTitle(d.title);
         setAuthor(d.author);
         setIsbn(d.isbn);
@@ -145,6 +147,35 @@ function QuickWishlistModal({ onClose, onSaved }: { onClose: () => void; onSaved
         }
       } else {
         setAlertMsg(isbnLookupNotFoundMessage(raw));
+      }
+    } catch {
+      setAlertMsg('Failed to fetch book data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFromTitleAuthor = async () => {
+    const t = title.trim();
+    const a = author.trim();
+    setLoading(true);
+    setFetchedFromCatalog(false);
+    try {
+      const d = await fetchBookDetailsByTitleAuthor(t, a);
+      if (d) {
+        setFetchedFromCatalog(true);
+        setTitle(d.title);
+        setAuthor(d.author);
+        if (d.isbn) setIsbn(d.isbn.replace(/[^\dX]/gi, ''));
+        if (d.coverImageURL) {
+          const cBlob = await urlToCompressedBlob(d.coverImageURL);
+          if (cBlob) {
+            setBlob(cBlob);
+            setPreview(URL.createObjectURL(cBlob));
+          }
+        }
+      } else {
+        setAlertMsg(titleAuthorLookupNotFoundMessage(t, a));
       }
     } catch {
       setAlertMsg('Failed to fetch book data.');
@@ -211,6 +242,32 @@ function QuickWishlistModal({ onClose, onSaved }: { onClose: () => void; onSaved
             </div>
           </div>
 
+          <div className="form-block">
+            <label className="label">Title</label>
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="form-block">
+            <label className="label">Author</label>
+            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} />
+          </div>
+          <div className="form-block">
+            <label className="label">Look up without ISBN</label>
+            <button
+              type="button"
+              className="btn-secondary full mt"
+              disabled={loading || !title.trim() || !author.trim()}
+              onClick={() => void loadFromTitleAuthor()}
+            >
+              {loading ? 'Fetching book data…' : 'Fill from title & author'}
+            </button>
+          </div>
+
+          {fetchedFromCatalog && (
+            <div className="form-block">
+              <div className="success-banner small">Book data found — title, author, and cover updated.</div>
+            </div>
+          )}
+
           <div className="form-block isbn-block">
             <label className="label">ISBN — scan or lookup</label>
             <div className="row gap">
@@ -237,18 +294,6 @@ function QuickWishlistModal({ onClose, onSaved }: { onClose: () => void; onSaved
             >
               {loading ? 'Fetching book data…' : 'Look up by ISBN'}
             </button>
-            {fetchedFromIsbn && (
-              <div className="success-banner small mt">Book data found — title, author, and cover updated.</div>
-            )}
-          </div>
-
-          <div className="form-block">
-            <label className="label">Title</label>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div className="form-block">
-            <label className="label">Author</label>
-            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} />
           </div>
           <div className="form-block">
             <label className="label">Notes</label>

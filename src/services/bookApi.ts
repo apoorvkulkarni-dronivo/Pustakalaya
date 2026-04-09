@@ -208,25 +208,50 @@ interface OpenLibSearchDoc {
   number_of_pages_median?: number;
   first_publish_year?: number;
   publisher?: string[];
+  isbn?: string[];
+  language?: string | string[];
 }
 
-async function fetchOpenLibrarySearch(isbn: string): Promise<BookDetails | null> {
-  const url = `https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const json = (await res.json()) as { docs?: OpenLibSearchDoc[] };
-  const doc = json.docs?.[0];
-  if (!doc?.title) return null;
+function pickIsbnFromSearchDoc(doc: OpenLibSearchDoc): string {
+  const arr = doc.isbn;
+  if (!Array.isArray(arr)) return '';
+  for (const raw of arr) {
+    const n = normalizeIsbnDigits(String(raw).replace(/[^\dX]/gi, ''));
+    if (n.length === 13 && /^\d{13}$/.test(n)) return n;
+  }
+  for (const raw of arr) {
+    const n = normalizeIsbnDigits(String(raw).replace(/[^\dX]/gi, ''));
+    if (n.length === 10 && /^\d{9}[\dX]$/.test(n)) return n;
+  }
+  return '';
+}
+
+function languageFromOpenLibSearchDoc(doc: OpenLibSearchDoc): string {
+  const lang = doc.language;
+  const code = (Array.isArray(lang) ? lang[0] : lang)?.toString().toLowerCase() ?? '';
+  if (code.startsWith('mar')) return 'Marathi';
+  if (code.startsWith('hin')) return 'Hindi';
+  if (code.startsWith('ger') || code.startsWith('deu')) return 'German';
+  if (code.startsWith('eng') || code === '') return 'English';
+  return 'English';
+}
+
+function openLibrarySearchDocToBookDetails(
+  doc: OpenLibSearchDoc,
+  isbnOverride?: string
+): BookDetails | null {
+  if (!doc.title) return null;
   const authorRaw = doc.author_name;
   const author = Array.isArray(authorRaw)
     ? authorRaw.join(', ')
     : (authorRaw ?? 'Unknown Author');
+  const isbn = isbnOverride ?? pickIsbnFromSearchDoc(doc);
   const coverUrl =
     doc.cover_i != null ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : null;
   const base: BookDetails = {
     title: doc.title,
     author,
-    language: 'English',
+    language: languageFromOpenLibSearchDoc(doc),
     numberOfPages: doc.number_of_pages_median ?? 0,
     isbn,
     description: null,
@@ -236,6 +261,66 @@ async function fetchOpenLibrarySearch(isbn: string): Promise<BookDetails | null>
     suggestedCategories: [],
   };
   return suggestCategories(base);
+}
+
+/** Loose match so we don’t auto-fill an unrelated hit. */
+function openLibraryDocMatchesTitleAuthor(
+  doc: OpenLibSearchDoc,
+  title: string,
+  author: string
+): boolean {
+  const t = title.trim().toLowerCase();
+  const a = author.trim().toLowerCase();
+  if (!t || !a) return false;
+  const dt = (doc.title ?? '').toLowerCase();
+  const da = Array.isArray(doc.author_name)
+    ? doc.author_name.join(' ').toLowerCase()
+    : String(doc.author_name ?? '').toLowerCase();
+  const titleWords = t.split(/\s+/).filter((w) => w.length > 1);
+  const titleOk =
+    dt === t ||
+    dt.includes(t) ||
+    t.includes(dt) ||
+    (titleWords.length > 0 &&
+      titleWords.filter((w) => dt.includes(w)).length >= Math.min(2, titleWords.length));
+  const authorToks = a.split(/\s+/).filter((w) => w.length > 1);
+  const authorOk = authorToks.length === 0 || authorToks.some((tok) => da.includes(tok));
+  return titleOk && authorOk;
+}
+
+async function fetchOpenLibrarySearch(isbn: string): Promise<BookDetails | null> {
+  const url = `https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const json = (await res.json()) as { docs?: OpenLibSearchDoc[] };
+  const doc = json.docs?.[0];
+  if (!doc) return null;
+  return openLibrarySearchDocToBookDetails(doc, isbn);
+}
+
+async function fetchOpenLibraryByTitleAuthor(
+  title: string,
+  author: string
+): Promise<BookDetails | null> {
+  const t = title.trim();
+  const a = author.trim();
+  if (!t || !a) return null;
+  const params = new URLSearchParams();
+  params.set('title', t);
+  params.set('author', a);
+  params.set('limit', '20');
+  const res = await fetch(`https://openlibrary.org/search.json?${params.toString()}`);
+  if (!res.ok) return null;
+  const json = (await res.json()) as { docs?: OpenLibSearchDoc[] };
+  const docs = json.docs;
+  if (!docs?.length) return null;
+  for (const doc of docs) {
+    if (openLibraryDocMatchesTitleAuthor(doc, t, a)) {
+      const book = openLibrarySearchDocToBookDetails(doc);
+      if (book) return book;
+    }
+  }
+  return null;
 }
 
 async function resolveOpenLibraryAuthor(data: OpenLibResponse): Promise<string> {
@@ -322,19 +407,74 @@ async function fetchOpenLibrary(isbn: string): Promise<BookDetails | null> {
   return fetchOpenLibrarySearch(isbn);
 }
 
+interface GoogleVolumeInfo {
+  title?: string;
+  authors?: string[];
+  language?: string;
+  pageCount?: number;
+  description?: string;
+  publishedDate?: string;
+  publisher?: string;
+  imageLinks?: { thumbnail?: string };
+  industryIdentifiers?: { type?: string; identifier?: string }[];
+}
+
 interface GoogleBooksResponse {
-  items?: {
-    volumeInfo: {
-      title?: string;
-      authors?: string[];
-      language?: string;
-      pageCount?: number;
-      description?: string;
-      publishedDate?: string;
-      publisher?: string;
-      imageLinks?: { thumbnail?: string };
-    };
-  }[];
+  items?: { volumeInfo: GoogleVolumeInfo }[];
+  error?: { code?: number; message?: string };
+}
+
+function pickIsbnFromGoogleVolume(v: GoogleVolumeInfo): string {
+  const ids = v.industryIdentifiers;
+  if (!ids) return '';
+  for (const typ of ['ISBN_13', 'ISBN_10'] as const) {
+    const id = ids.find((i) => i.type === typ)?.identifier;
+    if (id) {
+      const n = normalizeIsbnDigits(id.replace(/[^\dX]/gi, ''));
+      if (n.length === 13 || n.length === 10) return n;
+    }
+  }
+  return '';
+}
+
+function googleVolumeToBookDetails(v: GoogleVolumeInfo, isbnFallback: string): BookDetails | null {
+  if (!v.title) return null;
+  const isbn = pickIsbnFromGoogleVolume(v) || isbnFallback;
+  const thumb = v.imageLinks?.thumbnail?.replace(/^http:\/\//, 'https://') ?? null;
+  const base: BookDetails = {
+    title: v.title ?? 'Unknown Title',
+    author: v.authors?.join(', ') ?? 'Unknown Author',
+    language: (v.language ?? 'en').toUpperCase(),
+    numberOfPages: v.pageCount ?? 0,
+    isbn,
+    description: v.description ?? null,
+    publishDate: v.publishedDate ?? null,
+    publisher: v.publisher ?? null,
+    coverImageURL: thumb,
+    suggestedCategories: [],
+  };
+  return suggestCategories(base);
+}
+
+function googleVolumeMatchesTitleAuthor(
+  v: GoogleVolumeInfo,
+  title: string,
+  author: string
+): boolean {
+  const t = title.trim().toLowerCase();
+  const a = author.trim().toLowerCase();
+  const vt = (v.title ?? '').toLowerCase();
+  const va = (v.authors ?? []).join(' ').toLowerCase();
+  const titleWords = t.split(/\s+/).filter((w) => w.length > 1);
+  const titleOk =
+    vt === t ||
+    vt.includes(t) ||
+    t.includes(vt) ||
+    (titleWords.length > 0 &&
+      titleWords.filter((w) => vt.includes(w)).length >= Math.min(2, titleWords.length));
+  const authorToks = a.split(/\s+/).filter((w) => w.length > 1);
+  const authorOk = authorToks.length === 0 || authorToks.some((tok) => va.includes(tok));
+  return titleOk && authorOk;
 }
 
 function googleBooksApiKey(): string | undefined {
@@ -351,24 +491,40 @@ async function fetchGoogleBooks(isbn: string): Promise<BookDetails | null> {
   const res = await fetch(url);
   if (!res.ok) return null;
   const data = (await res.json()) as GoogleBooksResponse;
+  if (data.error) return null;
   const v = data.items?.[0]?.volumeInfo;
   if (!v) return null;
+  return googleVolumeToBookDetails(v, isbn);
+}
 
-  const thumb = v.imageLinks?.thumbnail?.replace(/^http:\/\//, 'https://') ?? null;
-
-  const base: BookDetails = {
-    title: v.title ?? 'Unknown Title',
-    author: v.authors?.join(', ') ?? 'Unknown Author',
-    language: (v.language ?? 'en').toUpperCase(),
-    numberOfPages: v.pageCount ?? 0,
-    isbn,
-    description: v.description ?? null,
-    publishDate: v.publishedDate ?? null,
-    publisher: v.publisher ?? null,
-    coverImageURL: thumb,
-    suggestedCategories: [],
-  };
-  return suggestCategories(base);
+async function fetchGoogleBooksByTitleAuthor(
+  title: string,
+  author: string
+): Promise<BookDetails | null> {
+  const t = title.trim();
+  const a = author.trim();
+  if (!t || !a) return null;
+  const key = googleBooksApiKey();
+  const intitle = encodeURIComponent(t);
+  const inauthor = encodeURIComponent(a);
+  const q = `intitle:${intitle}+inauthor:${inauthor}`;
+  const url = key
+    ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10&key=${encodeURIComponent(key)}`
+    : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = (await res.json()) as GoogleBooksResponse;
+  if (data.error) return null;
+  const items = data.items;
+  if (!items?.length) return null;
+  for (const item of items) {
+    const v = item.volumeInfo;
+    if (googleVolumeMatchesTitleAuthor(v, t, a)) {
+      const book = googleVolumeToBookDetails(v, '');
+      if (book) return book;
+    }
+  }
+  return null;
 }
 
 /** Shown when Open Library + Google Books have no usable match (new/rare ISBNs, or Google quota). */
@@ -431,6 +587,41 @@ export async function fetchBookDetails(isbn: string): Promise<BookDetails | null
     } catch {
       /* */
     }
+  }
+  return null;
+}
+
+/** Shown when Open Library + Google Books have no match for title + author. */
+export function titleAuthorLookupNotFoundMessage(title: string, author: string): string {
+  const t = title.trim();
+  const a = author.trim();
+  return [
+    `No catalog match for “${t || '—'}” by ${a || '—'}.`,
+    '',
+    'Try a slightly different spelling or subtitle, or fill the rest yourself.',
+    '',
+    'Optional: add VITE_GOOGLE_BOOKS_API_KEY for more matches via Google Books.',
+  ].join('\n');
+}
+
+export async function fetchBookDetailsByTitleAuthor(
+  title: string,
+  author: string
+): Promise<BookDetails | null> {
+  const t = title.trim();
+  const a = author.trim();
+  if (!t || !a) return null;
+  try {
+    const ol = await fetchOpenLibraryByTitleAuthor(t, a);
+    if (ol) return ol;
+  } catch {
+    /* */
+  }
+  try {
+    const gb = await fetchGoogleBooksByTitleAuthor(t, a);
+    if (gb) return gb;
+  } catch {
+    /* */
   }
   return null;
 }

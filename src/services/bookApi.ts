@@ -26,6 +26,28 @@ function normalizeIsbnDigits(isbn: string): string {
   return d;
 }
 
+/** True if the check digit matches (ISBN-10 or ISBN-13 / EAN-13 book codes). */
+export function isIsbnChecksumValid(isbn: string): boolean {
+  const d = normalizeIsbnDigits(isbn.replace(/[^\dX]/gi, ''));
+  if (d.length === 13 && /^\d{13}$/.test(d)) {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(d[i]!, 10) * (i % 2 === 0 ? 1 : 3);
+    }
+    const check = (10 - (sum % 10)) % 10;
+    return check === parseInt(d[12]!, 10);
+  }
+  if (d.length === 10 && /^\d{9}[\dX]$/.test(d)) {
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(d[i]!, 10) * (10 - i);
+    }
+    const checkVal = d[9] === 'X' ? 10 : parseInt(d[9]!, 10);
+    return (sum + checkVal) % 11 === 0;
+  }
+  return false;
+}
+
 /** Convert ISBN-10 body to EAN-13 (978 prefix) for Open Library lookups. */
 function isbn10ToIsbn13(isbn10: string): string | null {
   const d = normalizeIsbnDigits(isbn10);
@@ -352,14 +374,36 @@ async function fetchGoogleBooks(isbn: string): Promise<BookDetails | null> {
 /** Shown when Open Library + Google Books have no usable match (new/rare ISBNs, or Google quota). */
 export function isbnLookupNotFoundMessage(rawIsbn: string): string {
   const clean = normalizeIsbnDigits(rawIsbn.replace(/[^\dX]/gi, ''));
+  const looksLikeIsbn = clean.length === 10 || clean.length === 13;
+  const checksumOk = looksLikeIsbn && isIsbnChecksumValid(clean);
+
+  if (looksLikeIsbn && !checksumOk) {
+    return [
+      `“${clean}” does not pass the ISBN check digit (likely a typo or bad scan).`,
+      '',
+      'Fix the number and try again, or enter title and author manually.',
+    ].join('\n');
+  }
+
+  if (checksumOk) {
+    return [
+      `ISBN ${clean} is mathematically valid,`,
+      'but Open Library’s free database does not list this edition yet.',
+      '',
+      'That happens often for new releases, some UK/US-only prints, or books not yet added by volunteers.',
+      '',
+      'You can still fill title and author (e.g. from the book cover) and save—your ISBN will be stored.',
+      '',
+      'Optional: add VITE_GOOGLE_BOOKS_API_KEY for broader auto-fill via Google Books.',
+    ].join('\n');
+  }
+
   return [
-    `No automatic match for ISBN ${clean || rawIsbn}.`,
+    `No automatic match for: ${clean || rawIsbn}.`,
     '',
-    'Open Library (free) does not list this edition yet—very common for new releases or some regional prints.',
+    'Open Library (free) has no record, and Google Books may be unavailable without an API key.',
     '',
-    'You can still type the title and author below and save the book.',
-    '',
-    'Optional: add a Google Books API key as VITE_GOOGLE_BOOKS_API_KEY (repo secret on GitHub + .env locally) for more auto-fill results.',
+    'Enter title and author manually if you like.',
   ].join('\n');
 }
 

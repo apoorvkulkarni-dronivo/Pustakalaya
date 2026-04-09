@@ -47,9 +47,10 @@ export function EditBookModal({ book, open, onClose }: Props) {
   };
 
   const save = async () => {
-    const pages = parseInt(numberOfPages, 10);
-    if (!title.trim() || !author.trim() || Number.isNaN(pages)) {
-      setAlertMsg('Check title, author, and pages.');
+    const pagesRaw = numberOfPages.trim();
+    const pages = pagesRaw === '' ? 0 : parseInt(pagesRaw, 10);
+    if (!title.trim() || !author.trim() || (pagesRaw !== '' && Number.isNaN(pages))) {
+      setAlertMsg('Check title and author. Pages must be a number or empty (0).');
       return;
     }
     const nextCoverUrl =
@@ -116,12 +117,13 @@ export function EditBookModal({ book, open, onClose }: Props) {
             <input className="input" value={language} onChange={(e) => setLanguage(e.target.value)} />
           </div>
           <div className="form-block">
-            <label className="label">Pages</label>
+            <label className="label">Pages (optional)</label>
             <input
               className="input"
               inputMode="numeric"
               value={numberOfPages}
               onChange={(e) => setNumberOfPages(e.target.value)}
+              placeholder="0 if unknown"
             />
           </div>
           <div className="form-block">

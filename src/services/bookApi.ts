@@ -627,10 +627,24 @@ export async function fetchBookDetailsByTitleAuthor(
 }
 
 export function validateIsbnDigits(s: string): boolean {
-  const d = normalizeIsbnDigits(s);
+  const stripped = s.replace(/[^\dX]/gi, '');
+  const d = normalizeIsbnDigits(stripped);
   if (d.length === 13) return /^\d{13}$/.test(d);
   if (d.length === 10) return /^\d{9}[\dX]$/.test(d);
   return false;
+}
+
+/**
+ * Normalize camera / still-image scan output for ISBN lookup.
+ * Accepts ISBN-10, EAN-13, or 12-digit GTIN (leading 0 → EAN-13 for APIs).
+ */
+export function normalizeScannedBarcode(decoded: string): string | null {
+  if (!decoded?.trim()) return null;
+  const d = decoded.replace(/[^\dX]/gi, '').toUpperCase();
+  if (d.length === 10 && /^\d{9}[\dX]$/.test(d)) return d;
+  if (d.length === 13 && /^\d{13}$/.test(d)) return d;
+  if (d.length === 12 && /^\d{12}$/.test(d)) return `0${d}`;
+  return null;
 }
 
 export async function urlToCompressedBlob(

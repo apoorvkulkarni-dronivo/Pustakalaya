@@ -31,7 +31,7 @@ const initialForm = () => ({
 });
 
 export function AddBookModal({ open, onClose }: Props) {
-  const { addBook } = useLibrary();
+  const { addBook, user } = useLibrary();
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [language, setLanguage] = useState('English');
@@ -169,9 +169,14 @@ export function AddBookModal({ open, onClose }: Props) {
   };
 
   const save = async () => {
-    const pages = parseInt(numberOfPages, 10);
-    if (!title.trim() || !author.trim() || Number.isNaN(pages)) {
-      setAlertMsg('Title, author, and valid page count are required.');
+    if (!user) {
+      setAlertMsg('Sign in to save books to your library.');
+      return;
+    }
+    const pagesRaw = numberOfPages.trim();
+    const pages = pagesRaw === '' ? 0 : parseInt(pagesRaw, 10);
+    if (!title.trim() || !author.trim() || (pagesRaw !== '' && Number.isNaN(pages))) {
+      setAlertMsg('Title and author are required. Page count must be a number or left empty (we will use 0).');
       return;
     }
     await addBook(
@@ -334,19 +339,20 @@ export function AddBookModal({ open, onClose }: Props) {
             </div>
           </div>
           <div className="form-block">
-            <label className="label">Number of pages</label>
+            <label className="label">Number of pages (optional)</label>
             <input
               className="input"
               inputMode="numeric"
               value={numberOfPages}
               onChange={(e) => setNumberOfPages(e.target.value)}
+              placeholder="0 if unknown"
             />
           </div>
 
           <button
             type="button"
             className="btn-primary full"
-            disabled={!title.trim() || !author.trim() || !numberOfPages.trim()}
+            disabled={!title.trim() || !author.trim()}
             onClick={() => void save()}
           >
             Save

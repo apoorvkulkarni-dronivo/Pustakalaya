@@ -63,9 +63,17 @@ The Spark (free) plan includes Firestore and Storage **free-tier quotas**; you o
 | `npm run preview` | Preview production build locally |
 | `npm run lint` | ESLint                   |
 
-## Deploying (e.g. GitHub Pages)
+## GitHub Pages (`https://ak-apoorvkulkarni.github.io/Pustakalaya/`)
 
-`vite.config.ts` uses `base: './'` so assets resolve correctly when hosted from a subpath. Build with `npm run build` and publish the `dist/` folder.
+1. In the GitHub repo: **Settings → Pages → Build and deployment → Source**: choose **GitHub Actions** (not “Deploy from a branch”).
+2. Push to **`main`**; the workflow **Deploy to GitHub Pages** (`.github/workflows/deploy-pages.yml`) builds with `VITE_BASE=/Pustakalaya/` and publishes `dist/`.
+3. **Firebase (live site):** Under **Settings → Secrets and variables → Actions**, add repository secrets matching your `.env` (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, etc.). Without them, the build still succeeds but the app shows the setup screen. In Firebase Console → **Authentication → Settings → Authorized domains**, add **`ak-apoorvkulkarni.github.io`** so Google sign-in works on Pages.
+
+Local preview of a Pages-like build:
+
+```bash
+VITE_BASE=/Pustakalaya/ npm run build && VITE_BASE=/Pustakalaya/ npx vite preview
+```
 
 ## Privacy
 

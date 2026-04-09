@@ -21,6 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Registers this repo with GitHub Pages for Action-based deploys (required once Pages source is “GitHub Actions”).
+      - uses: actions/configure-pages@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

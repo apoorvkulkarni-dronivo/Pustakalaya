@@ -6,6 +6,7 @@ dist-ssr
 
 # Local env with secrets (keep .env.example committed)
 .env
+docs/GITHUB_SECRETS_COPY_PASTE.md
 
 # Logs
 logs

@@ -43,6 +43,7 @@ export function AddBookModal({ open, onClose }: Props) {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [fetched, setFetched] = useState<BookDetails | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
@@ -60,12 +61,14 @@ export function AddBookModal({ open, onClose }: Props) {
     setCoverBlob(s.coverBlob);
     setFetched(s.fetched);
     setLoading(false);
+    setSaving(false);
     setAlertMsg(null);
   }, [open]);
 
   if (!open) return null;
 
   const close = () => {
+    if (saving) return;
     const s = initialForm();
     setTitle(s.title);
     setAuthor(s.author);
@@ -169,6 +172,7 @@ export function AddBookModal({ open, onClose }: Props) {
   };
 
   const save = async () => {
+    if (saving || loading) return;
     if (!user) {
       setAlertMsg('Sign in to save books to your library.');
       return;
@@ -179,21 +183,29 @@ export function AddBookModal({ open, onClose }: Props) {
       setAlertMsg('Title and author are required. Page count must be a number or left empty (we will use 0).');
       return;
     }
-    await addBook(
-      {
-        title: title.trim(),
-        author: author.trim(),
-        language,
-        categories: Array.from(selectedCategories),
-        numberOfPages: pages,
-        isbn: isbn.trim() || null,
-        coverImageUrl: null,
-        isLent: false,
-        lendingRecord: null,
-      },
-      coverBlob
-    );
-    close();
+    setSaving(true);
+    try {
+      await addBook(
+        {
+          title: title.trim(),
+          author: author.trim(),
+          language,
+          categories: Array.from(selectedCategories),
+          numberOfPages: pages,
+          isbn: isbn.trim() || null,
+          coverImageUrl: null,
+          isLent: false,
+          lendingRecord: null,
+        },
+        coverBlob
+      );
+      close();
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : 'Failed to save book.';
+      setAlertMsg(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -268,7 +280,7 @@ export function AddBookModal({ open, onClose }: Props) {
             <button
               type="button"
               className="btn-secondary full mt"
-              disabled={loading || !title.trim() || !author.trim()}
+              disabled={loading || saving || !title.trim() || !author.trim()}
               onClick={() => void loadFromTitleAuthor()}
             >
               {loading ? 'Fetching book data…' : 'Fill from title & author'}
@@ -293,7 +305,7 @@ export function AddBookModal({ open, onClose }: Props) {
               <button
                 type="button"
                 className="btn-primary"
-                disabled={loading}
+                disabled={loading || saving}
                 onClick={() => setScannerOpen(true)}
               >
                 {loading ? '…' : 'Scan'}
@@ -302,7 +314,7 @@ export function AddBookModal({ open, onClose }: Props) {
             <button
               type="button"
               className="btn-secondary full mt"
-              disabled={loading || !isbn.trim()}
+              disabled={loading || saving || !isbn.trim()}
               onClick={() => loadFromIsbn(isbn)}
             >
               {loading ? 'Fetching book data…' : 'Scan ISBN barcode'}
@@ -352,10 +364,10 @@ export function AddBookModal({ open, onClose }: Props) {
           <button
             type="button"
             className="btn-primary full"
-            disabled={!title.trim() || !author.trim()}
+            disabled={!title.trim() || !author.trim() || loading || saving}
             onClick={() => void save()}
           >
-            Save
+            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
